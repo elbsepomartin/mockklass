@@ -152,6 +152,22 @@ exports.processTransactions = async() => {
         // Send request to remote bank
         try {
 
+            const nock = require('nock')
+            let nockScope
+
+            if (process.env.TEST_MODE === 'true') {
+
+                const nockUrl = new URL(bankTo.transactionUrl)
+
+                console.log('Nocking '+ JSON.stringify(nockUrl));
+
+                nockScope = nock(`${nockUrl.protocol}//${nockUrl.host}`)
+                    .persist()
+                    .post(nockUrl.pathname)
+                    .reply(200, {receiverName: 'testklass'})
+
+            }
+
             console.log('loop: Making request to ' + bankTo.transactionUrl);
 
             // Abort connection after 1 second
@@ -245,7 +261,36 @@ exports.processTransactions = async() => {
 exports.refreshBanksFromCentralBank = async() => {
 
     try {
+        let nockScope, nock
+
         console.log('Refreshing banks');
+
+        // Mock central bank responses in TEST_MODE
+        if (process.env.TEST_MODE === 'true') {
+            nock = require('nock')
+            console.log(process.env.TEST_MODE === 'true');
+            nockScope = nock(process.env.CENTRAL_BANK_URL)
+                .persist()
+                .get('/banks')
+                .reply(200,
+                    [
+                        {
+                            "name": "Bank A",
+                            "owners": "John Doe",
+                            "jwksUrl": "https://banka.com/jwks",
+                            "transactionUrl": "https://banka.com/transactions/b2b",
+                            "bankPrefix": "aaa"
+                        },
+                        {
+                            "name": "Bank B",
+                            "owners": "Jane Doe",
+                            "jwksUrl": "https://bankb.com/jwks",
+                            "transactionUrl": "https://bankb.com/transactions/b2b",
+                            "bankPrefix": "bbb"
+                        }
+                    ]
+                )
+        }
 
         console.log('Attempting to contact central bank at ' + `${process.env.CENTRAL_BANK_URL}/banks`)
         banks = await fetch(`${process.env.CENTRAL_BANK_URL}/banks`, {
